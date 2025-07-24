@@ -32,8 +32,9 @@ resource "aws_budgets_budget" "account_budget" {
   time_unit    = "MONTHLY"
   time_period_start = "2024-01-01_00:00"
 
-  cost_filters = {
-    Service = ["*"]
+  cost_filter {
+    name   = "Service"
+    values = ["*"]
   }
 
   notification {
@@ -58,6 +59,31 @@ resource "aws_budgets_budget" "account_budget" {
     threshold_type       = "PERCENTAGE"
     notification_type    = "ACTUAL"
     subscriber_sns_topic_arns = [aws_sns_topic.budget_alarm.arn]
+  }
+}
+
+# Budget Action to trigger Lambda when budget is breached
+resource "aws_budgets_budget_action" "shutdown_action" {
+  budget_name    = aws_budgets_budget.account_budget.name
+  action_type    = "RUN_SSM_DOCUMENTS"
+  approval_model = "AUTOMATIC"
+  
+  action_threshold {
+    action_threshold_type  = "PERCENTAGE"
+    action_threshold_value = 100
+  }
+  
+  definition {
+    ssm_action_definition {
+      action_sub_type = "STOP_EC2_INSTANCES"
+      region         = var.aws_region
+      instance_ids   = ["*"]
+    }
+  }
+  
+  subscriber {
+    address           = var.notification_email
+    subscription_type = "EMAIL"
   }
 }
 
